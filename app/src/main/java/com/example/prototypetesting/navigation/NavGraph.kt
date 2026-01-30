@@ -13,6 +13,7 @@ import com.example.prototypetesting.ui.screens.AgentTestScreen
 import com.example.prototypetesting.ui.screens.HomeScreen
 import com.example.prototypetesting.ui.screens.ProfileScreen
 import com.example.prototypetesting.ui.screens.ProjectDetailScreen
+import com.example.prototypetesting.ui.screens.PrototypePreviewScreen
 import com.example.prototypetesting.ui.screens.TestManagementScreen
 import com.example.prototypetesting.ui.screens.TestReportScreen
 import com.example.prototypetesting.ui.screens.TestRunnerScreen
@@ -115,6 +116,40 @@ fun NavGraph(navController: NavHostController) {
             TestReportScreen(
                 navController = navController,
                 projectName = projectName
+            )
+        }
+
+        // 原型预览页面 - "即画即测"交互
+        composable(
+            route = "${Screen.PrototypePreview.route}/{projectName}/{imageUris}/{initialPageIndex}",
+            arguments = listOf(
+                navArgument("projectName") { type = NavType.StringType },
+                navArgument("imageUris") { type = NavType.StringType },
+                navArgument("initialPageIndex") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val encodedProjectName = backStackEntry.arguments?.getString("projectName") ?: ""
+            val encodedImageUris = backStackEntry.arguments?.getString("imageUris") ?: ""
+            val initialPageIndex = backStackEntry.arguments?.getInt("initialPageIndex") ?: 0
+
+            val projectName = try {
+                URLDecoder.decode(encodedProjectName, StandardCharsets.UTF_8.toString())
+            } catch (e: Exception) {
+                encodedProjectName
+            }
+
+            val imageUrisString = try {
+                URLDecoder.decode(encodedImageUris, StandardCharsets.UTF_8.toString())
+            } catch (e: Exception) {
+                encodedImageUris
+            }
+
+            val imageUris = imageUrisString.split(",").filter { it.isNotEmpty() }
+            PrototypePreviewScreen(
+                navController = navController,
+                projectName = projectName,
+                imageUris = imageUris,
+                initialPageIndex = initialPageIndex
             )
         }
     }

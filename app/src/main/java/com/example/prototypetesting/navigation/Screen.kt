@@ -9,4 +9,5 @@ sealed class Screen(val route: String) {
     object ProjectDetail : Screen("project_detail")
     object TestRunner : Screen("test_runner")
     object TestReport : Screen("test_report")
+    object PrototypePreview : Screen("prototype_preview")
 }
