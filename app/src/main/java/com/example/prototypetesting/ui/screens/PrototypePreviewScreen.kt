@@ -3,12 +3,14 @@ package com.example.prototypetesting.ui.screens
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,10 +20,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.prototypetesting.data.DemoScenarioData
@@ -29,18 +34,21 @@ import com.example.prototypetesting.data.Hotspot
 import com.example.prototypetesting.navigation.Screen
 import com.example.prototypetesting.ui.components.InteractivePrototype
 import com.example.prototypetesting.ui.theme.*
+import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import kotlin.math.absoluteValue
 
 /**
- * 原型预览页面
+ * 原型预览页面 - 支持丝滑的上下翻页效果
  *
- * "即画即测"的核心页面，用户可以：
- * 1. 查看识别出的热区
- * 2. 点击热区进行页面跳转
- * 3. 模拟真实 App 的交互流程
+ * 使用 VerticalPager 实现：
+ * 1. 上下滑动切换页面
+ * 2. 弹性过渡动画
+ * 3. 页面缩放效果
+ * 4. 热区点击跳转
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PrototypePreviewScreen(
     navController: NavController,
@@ -48,48 +56,54 @@ fun PrototypePreviewScreen(
     imageUris: List<String>,
     initialPageIndex: Int = 0
 ) {
-    var currentPageIndex by remember { mutableIntStateOf(initialPageIndex) }
+    val scope = rememberCoroutineScope()
+
+    // Pager 状态
+    val pagerState = rememberPagerState(
+        initialPage = initialPageIndex,
+        pageCount = { imageUris.size }
+    )
+
     var showHotspots by remember { mutableStateOf(true) }
-    var showPageNavigator by remember { mutableStateOf(true) }
     var interactionCount by remember { mutableIntStateOf(0) }
     var navigationHistory by remember { mutableStateOf(listOf(initialPageIndex)) }
 
-    // 获取当前页面的热区
-    val currentHotspots = remember(currentPageIndex) {
-        DemoScenarioData.getHotspotsForPage(currentPageIndex)
+    // 记录导航历史
+    LaunchedEffect(pagerState.currentPage) {
+        if (navigationHistory.lastOrNull() != pagerState.currentPage) {
+            navigationHistory = navigationHistory + pagerState.currentPage
+        }
     }
 
-    // 页面跳转动画
-    var isTransitioning by remember { mutableStateOf(false) }
-
-    // 处理热区点击
+    // 处理热区点击跳转
     fun handleHotspotClick(hotspot: Hotspot) {
         interactionCount++
-
         if (hotspot.targetScreenId != null) {
             val targetIndex = DemoScenarioData.getPageIndexById(hotspot.targetScreenId)
-            if (targetIndex in imageUris.indices && targetIndex != currentPageIndex) {
-                isTransitioning = true
-                navigationHistory = navigationHistory + targetIndex
-                currentPageIndex = targetIndex
+            if (targetIndex in imageUris.indices && targetIndex != pagerState.currentPage) {
+                scope.launch {
+                    pagerState.animateScrollToPage(
+                        page = targetIndex,
+                        animationSpec = tween(
+                            durationMillis = 500,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                }
             }
         }
     }
 
-    // 返回上一页
+    // 返回处理
     fun handleBack() {
         if (navigationHistory.size > 1) {
+            val previousPage = navigationHistory.dropLast(1).last()
             navigationHistory = navigationHistory.dropLast(1)
-            currentPageIndex = navigationHistory.last()
+            scope.launch {
+                pagerState.animateScrollToPage(previousPage)
+            }
         } else {
             navController.popBackStack()
-        }
-    }
-
-    LaunchedEffect(isTransitioning) {
-        if (isTransitioning) {
-            kotlinx.coroutines.delay(300)
-            isTransitioning = false
         }
     }
 
@@ -155,125 +169,173 @@ fun PrototypePreviewScreen(
             ) {
                 // 状态栏
                 PreviewStatusBar(
-                    currentPage = currentPageIndex + 1,
+                    currentPage = pagerState.currentPage + 1,
                     totalPages = imageUris.size,
                     interactionCount = interactionCount,
                     showHotspots = showHotspots
                 )
 
-                // 原型预览
+                // 垂直翻页区域
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedContent(
-                        targetState = currentPageIndex,
-                        transitionSpec = {
-                            if (targetState > initialState) {
-                                // 向前导航
-                                slideInHorizontally { width -> width } + fadeIn() togetherWith
-                                        slideOutHorizontally { width -> -width } + fadeOut()
-                            } else {
-                                // 向后导航
-                                slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                                        slideOutHorizontally { width -> width } + fadeOut()
-                            }.using(SizeTransform(clip = false))
-                        },
-                        label = "pageTransition"
+                    VerticalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 40.dp),
+                        pageSpacing = 20.dp,
+                        beyondViewportPageCount = 1
                     ) { pageIndex ->
-                        if (pageIndex in imageUris.indices) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .aspectRatio(0.5f)  // 手机比例
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(Color.White)
-                                    .border(3.dp, Color(0xFF333333), RoundedCornerShape(24.dp))
-                            ) {
-                                // 模拟手机刘海
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 8.dp)
-                                        .width(80.dp)
-                                        .height(24.dp)
-                                        .background(Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-                                )
+                        // 计算页面的偏移量，用于动画效果
+                        val pageOffset = (
+                            (pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction
+                        ).absoluteValue
 
-                                // 原型内容
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(top = 36.dp, bottom = 20.dp, start = 4.dp, end = 4.dp)
-                                ) {
-                                    InteractivePrototype(
-                                        imageUri = imageUris[pageIndex],
-                                        hotspots = DemoScenarioData.getHotspotsForPage(pageIndex),
-                                        showHotspots = showHotspots,
-                                        onHotspotClick = { hotspot ->
-                                            handleHotspotClick(hotspot)
-                                        },
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-
-                                // 模拟 Home 指示器
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 6.dp)
-                                        .width(100.dp)
-                                        .height(4.dp)
-                                        .background(Color(0xFF333333), RoundedCornerShape(2.dp))
-                                )
-                            }
-                        }
-                    }
-
-                    // 页面切换过渡效果
-                    if (isTransitioning) {
-                        Box(
+                        PhoneFrameCard(
+                            imageUri = imageUris[pageIndex],
+                            pageIndex = pageIndex,
+                            hotspots = DemoScenarioData.getHotspotsForPage(pageIndex),
+                            showHotspots = showHotspots,
+                            pageOffset = pageOffset,
+                            onHotspotClick = { hotspot -> handleHotspotClick(hotspot) },
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.3f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = Color(0xFF00FF88),
-                                modifier = Modifier.size(40.dp)
-                            )
-                        }
+                                .fillMaxWidth()
+                                .padding(horizontal = 40.dp)
+                        )
                     }
-                }
 
-                // 页面导航器
-                AnimatedVisibility(
-                    visible = showPageNavigator && imageUris.size > 1,
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut()
-                ) {
-                    PageNavigator(
-                        imageUris = imageUris,
-                        currentIndex = currentPageIndex,
-                        navigationHistory = navigationHistory,
-                        onPageSelect = { index ->
-                            if (index != currentPageIndex) {
-                                navigationHistory = navigationHistory + index
-                                currentPageIndex = index
-                            }
-                        }
+                    // 右侧页面指示器
+                    PageIndicator(
+                        currentPage = pagerState.currentPage,
+                        totalPages = imageUris.size,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 16.dp)
                     )
                 }
+
+                // 底部导航提示
+                BottomNavigationHint(
+                    currentPage = pagerState.currentPage,
+                    totalPages = imageUris.size,
+                    onPageClick = { targetPage ->
+                        scope.launch {
+                            pagerState.animateScrollToPage(targetPage)
+                        }
+                    }
+                )
             }
 
-            // 浮动提示
-            FloatingHint(
+            // 浮动操作提示
+            SwipeHint(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp, 100.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 手机框架卡片 - 带动画效果
+ */
+@Composable
+private fun PhoneFrameCard(
+    imageUri: String,
+    pageIndex: Int,
+    hotspots: List<Hotspot>,
+    showHotspots: Boolean,
+    pageOffset: Float,
+    onHotspotClick: (Hotspot) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 根据偏移量计算缩放和透明度
+    val scale = lerp(
+        start = 0.85f,
+        stop = 1f,
+        fraction = 1f - pageOffset.coerceIn(0f, 1f)
+    )
+
+    val alpha = lerp(
+        start = 0.5f,
+        stop = 1f,
+        fraction = 1f - pageOffset.coerceIn(0f, 1f)
+    )
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .fillMaxHeight(0.85f)
+            .aspectRatio(0.48f)
+            .clip(RoundedCornerShape(32.dp))
+            .background(Color(0xFF2A2A2A))
+            .border(4.dp, Color(0xFF3A3A3A), RoundedCornerShape(32.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        // 手机内屏
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color.White)
+        ) {
+            // 刘海
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+                    .width(80.dp)
+                    .height(24.dp)
+                    .background(Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
+            )
+
+            // 原型内容
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 36.dp, bottom = 24.dp, start = 4.dp, end = 4.dp)
+            ) {
+                InteractivePrototype(
+                    imageUri = imageUri,
+                    hotspots = hotspots,
+                    showHotspots = showHotspots,
+                    onHotspotClick = onHotspotClick,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // 页面标签
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 40.dp)
+                    .background(Color(0xFF00FF88), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = DemoScenarioData.demoPages.getOrNull(pageIndex)?.name ?: "页面${pageIndex + 1}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+            }
+
+            // Home 指示器
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+                    .width(100.dp)
+                    .height(4.dp)
+                    .background(Color(0xFF333333), RoundedCornerShape(2.dp))
             )
         }
     }
@@ -313,6 +375,22 @@ private fun PreviewStatusBar(
             )
         }
 
+        // 滑动提示
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.SwipeVertical,
+                contentDescription = null,
+                tint = Color(0xFFFF9800),
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "上下滑动翻页",
+                fontSize = 13.sp,
+                color = Color(0xFFFF9800)
+            )
+        }
+
         // 交互计数
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -328,91 +406,79 @@ private fun PreviewStatusBar(
                 color = Color.White
             )
         }
+    }
+}
 
-        // 热区状态
-        Row(verticalAlignment = Alignment.CenterVertically) {
+/**
+ * 右侧页面指示器
+ */
+@Composable
+private fun PageIndicator(
+    currentPage: Int,
+    totalPages: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        repeat(totalPages) { index ->
+            val isSelected = index == currentPage
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(if (isSelected) 12.dp else 8.dp)
                     .background(
-                        if (showHotspots) Color(0xFF00FF88) else Color(0xFF666666),
-                        CircleShape
+                        color = if (isSelected) Color(0xFF00FF88) else Color(0xFF555555),
+                        shape = CircleShape
                     )
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (showHotspots) "热区显示" else "热区隐藏",
-                fontSize = 13.sp,
-                color = if (showHotspots) Color(0xFF00FF88) else Color(0xFF666666)
             )
         }
     }
 }
 
 /**
- * 页面导航器
+ * 底部导航提示
  */
 @Composable
-private fun PageNavigator(
-    imageUris: List<String>,
-    currentIndex: Int,
-    navigationHistory: List<Int>,
-    onPageSelect: (Int) -> Unit
+private fun BottomNavigationHint(
+    currentPage: Int,
+    totalPages: Int,
+    onPageClick: (Int) -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF2A2A2A))
-            .padding(16.dp)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // 导航历史
-        if (navigationHistory.size > 1) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Route,
-                    contentDescription = null,
-                    tint = Color(0xFF00FF88),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "导航路径: ",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-                navigationHistory.forEachIndexed { index, pageIndex ->
-                    Text(
-                        text = DemoScenarioData.demoPages.getOrNull(pageIndex)?.name ?: "页面${pageIndex + 1}",
-                        fontSize = 11.sp,
-                        color = if (index == navigationHistory.lastIndex) Color(0xFF00FF88) else Color.White.copy(alpha = 0.8f)
+        repeat(totalPages) { index ->
+            val isSelected = index == currentPage
+            val pageName = DemoScenarioData.demoPages.getOrNull(index)?.name ?: "页面${index + 1}"
+
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isSelected) Color(0xFF00FF88).copy(alpha = 0.2f)
+                        else Color.Transparent
                     )
-                    if (index < navigationHistory.lastIndex) {
-                        Text(
-                            text = " → ",
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.4f)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // 页面缩略图
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            itemsIndexed(imageUris) { index, uri ->
-                PageThumbnail(
-                    imageUri = uri,
-                    pageIndex = index,
-                    pageName = DemoScenarioData.demoPages.getOrNull(index)?.name ?: "页面${index + 1}",
-                    isSelected = index == currentIndex,
-                    isInHistory = index in navigationHistory,
-                    onClick = { onPageSelect(index) }
+                    .border(
+                        width = if (isSelected) 1.dp else 0.dp,
+                        color = if (isSelected) Color(0xFF00FF88) else Color.Transparent,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .clickable { onPageClick(index) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = pageName,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Color(0xFF00FF88) else Color.White.copy(alpha = 0.6f)
                 )
             }
         }
@@ -420,82 +486,37 @@ private fun PageNavigator(
 }
 
 /**
- * 页面缩略图
+ * 滑动提示动画
  */
 @Composable
-private fun PageThumbnail(
-    imageUri: String,
-    pageIndex: Int,
-    pageName: String,
-    isSelected: Boolean,
-    isInHistory: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .width(60.dp)
-                .aspectRatio(0.6f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (isSelected) Color(0xFF00FF88).copy(alpha = 0.2f) else Color(0xFF3A3A3A))
-                .border(
-                    width = if (isSelected) 2.dp else 1.dp,
-                    color = when {
-                        isSelected -> Color(0xFF00FF88)
-                        isInHistory -> Color(0xFF00BCD4).copy(alpha = 0.5f)
-                        else -> Color(0xFF555555)
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .clickable(onClick = onClick)
-        ) {
-            AsyncImage(
-                model = Uri.parse(imageUri),
-                contentDescription = pageName,
-                modifier = Modifier.fillMaxSize()
-            )
+private fun SwipeHint(modifier: Modifier = Modifier) {
+    var isVisible by remember { mutableStateOf(true) }
 
-            // 选中标记
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF00FF88).copy(alpha = 0.1f))
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = pageName,
-            fontSize = 10.sp,
-            color = if (isSelected) Color(0xFF00FF88) else Color.White.copy(alpha = 0.7f)
-        )
-    }
-}
-
-/**
- * 浮动提示
- */
-@Composable
-private fun FloatingHint(modifier: Modifier = Modifier) {
-    var isExpanded by remember { mutableStateOf(true) }
-
+    // 5秒后隐藏提示
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(5000)
-        isExpanded = false
+        isVisible = false
     }
 
+    // 上下浮动动画
+    val infiniteTransition = rememberInfiniteTransition(label = "swipe")
+    val offsetY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "offsetY"
+    )
+
     AnimatedVisibility(
-        visible = true,
+        visible = isVisible,
+        enter = fadeIn(),
+        exit = fadeOut(),
         modifier = modifier
     ) {
         Card(
-            modifier = Modifier
-                .clickable { isExpanded = !isExpanded },
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFF2A2A2A).copy(alpha = 0.95f)
@@ -506,21 +527,26 @@ private fun FloatingHint(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.TouchApp,
+                    imageVector = Icons.Default.SwipeVertical,
                     contentDescription = null,
                     tint = Color(0xFF00FF88),
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { translationY = offsetY }
                 )
-
-                AnimatedVisibility(visible = isExpanded) {
-                    Row {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "点击绿色按钮可跳转页面",
-                            fontSize = 12.sp,
-                            color = Color.White
-                        )
-                    }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "上下滑动",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "切换页面",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
