@@ -1,5 +1,8 @@
 package com.example.prototypetesting.ui.screens
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +24,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -28,13 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.prototypetesting.ui.theme.BackgroundBlue
 import com.example.prototypetesting.ui.theme.PrimaryBlue
 import com.example.prototypetesting.ui.theme.TextPrimary
@@ -42,11 +47,14 @@ import com.example.prototypetesting.ui.theme.TextSecondary
 import com.example.prototypetesting.ui.theme.TextWhite
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoUploadScreen(navController: NavController) {
+    val context = LocalContext.current
     var faceVideoUri by remember { mutableStateOf<Uri?>(null) }
     var screenVideoUri by remember { mutableStateOf<Uri?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
@@ -111,11 +119,31 @@ fun VideoUploadScreen(navController: NavController) {
 
     val faceVideoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri -> faceVideoUri = uri }
+        onResult = { uri ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
+            faceVideoUri = uri
+        }
     )
     val screenVideoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri -> screenVideoUri = uri }
+        onResult = { uri ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
+            screenVideoUri = uri
+        }
     )
 
     Box(
@@ -269,6 +297,7 @@ private fun VideoUploadCard(
     selectedUri: Uri?,
     onClick: () -> Unit
 ) {
+    val thumbnail = rememberVideoThumbnail(selectedUri)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -319,14 +348,21 @@ private fun VideoUploadCard(
                             tint = PrimaryBlue,
                             modifier = Modifier.size(28.dp)
                         )
-                    } else {
-                        AsyncImage(
-                            model = selectedUri,
+                    } else if (thumbnail != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = thumbnail,
                             contentDescription = "视频封面",
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Videocam,
+                            contentDescription = "视频",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
@@ -358,4 +394,35 @@ private fun VideoUploadCard(
             }
         }
     }
+}
+
+@Composable
+private fun rememberVideoThumbnail(uri: Uri?): androidx.compose.ui.graphics.ImageBitmap? {
+    val context = LocalContext.current
+    return produceState(initialValue = null as androidx.compose.ui.graphics.ImageBitmap?, uri) {
+        value = null
+        if (uri == null) return@produceState
+        value = withContext(Dispatchers.IO) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                val fileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
+                    ?: return@withContext null
+                fileDescriptor.use {
+                    retriever.setDataSource(it.fileDescriptor)
+                    val frame: Bitmap? = retriever.getFrameAtTime(
+                        0,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    )
+                    frame?.asImageBitmap()
+                }
+            } catch (_: Exception) {
+                null
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }.value
 }
