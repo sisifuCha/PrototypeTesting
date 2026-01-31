@@ -10,4 +10,6 @@ sealed class Screen(val route: String) {
     object TestRunner : Screen("test_runner")
     object TestReport : Screen("test_report")
     object PrototypePreview : Screen("prototype_preview")
+    object VideoUpload : Screen("video_upload")
+    object AiReport : Screen("ai_report")
 }

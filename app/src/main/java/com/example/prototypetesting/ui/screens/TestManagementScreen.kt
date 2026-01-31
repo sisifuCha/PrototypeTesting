@@ -41,7 +41,7 @@ fun TestManagementScreen(navController: NavController) {
             .background(BackgroundBlue)
     ) {
         item {
-            TestManagementHeader()
+            TestManagementHeader(navController)
         }
         
         item {
@@ -62,7 +62,7 @@ fun TestManagementScreen(navController: NavController) {
         }
         
         item {
-            TestRecordsSection()
+            TestRecordsSection(navController)
         }
     }
     
@@ -78,7 +78,7 @@ fun TestManagementScreen(navController: NavController) {
 }
 
 @Composable
-fun TestManagementHeader() {
+fun TestManagementHeader(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,7 +136,7 @@ fun TestManagementHeader() {
             }
             
             Button(
-                onClick = { },
+                onClick = { navController.navigate("video_upload") },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = TextWhite.copy(alpha = 0.2f)
                 ),
@@ -382,7 +382,7 @@ fun ProjectTestCard(
 }
 
 @Composable
-fun TestRecordsSection() {
+fun TestRecordsSection(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -419,14 +419,20 @@ fun TestRecordsSection() {
         Spacer(modifier = Modifier.height(12.dp))
         
         SampleData.testRecords.forEach { record ->
-            TestRecordItem(record = record)
+            TestRecordItem(
+                record = record,
+                onOpenReport = { navController.navigate("ai_report") }
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-fun TestRecordItem(record: TestRecord) {
+fun TestRecordItem(
+    record: TestRecord,
+    onOpenReport: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -517,7 +523,7 @@ fun TestRecordItem(record: TestRecord) {
                 if (record.status == TestStatus.COMPLETED) {
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(
-                        onClick = { },
+                        onClick = onOpenReport,
                         contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.height(24.dp)
                     ) {

@@ -18,6 +18,8 @@ import com.example.prototypetesting.ui.screens.TestManagementScreen
 import com.example.prototypetesting.ui.screens.TestReportScreen
 import com.example.prototypetesting.ui.screens.TestRunnerScreen
 import com.example.prototypetesting.ui.screens.UploadScreen
+import com.example.prototypetesting.ui.screens.VideoUploadScreen
+import com.example.prototypetesting.ui.screens.AiReportScreen
 
 @Composable
 fun NavGraph(navController: NavHostController) {
@@ -39,6 +41,12 @@ fun NavGraph(navController: NavHostController) {
         }
         composable(Screen.Upload.route) {
             UploadScreen(navController)
+        }
+        composable(Screen.VideoUpload.route) {
+            VideoUploadScreen(navController)
+        }
+        composable(Screen.AiReport.route) {
+            AiReportScreen(navController)
         }
         composable(
             route = "${Screen.ProjectDetail.route}/{projectName}/{imageUris}",
