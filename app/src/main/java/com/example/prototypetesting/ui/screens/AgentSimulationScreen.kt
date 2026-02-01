@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -62,7 +64,6 @@ fun AgentSimulationScreen(
 
     // 思维链日志
     val visibleLogs = remember { mutableStateListOf<ThinkingLog>() }
-    val logListState = rememberLazyListState()
     var isLogExpanded by remember { mutableStateOf(true) }
 
     // 动画
@@ -81,9 +82,6 @@ fun AgentSimulationScreen(
                 if (currentLogIndex < script.thinkingLogs.size) {
                     visibleLogs.add(script.thinkingLogs[currentLogIndex])
                     currentLogIndex++
-                    if (visibleLogs.isNotEmpty()) {
-                        logListState.animateScrollToItem(visibleLogs.size - 1)
-                    }
                 }
 
                 when (action) {
@@ -140,9 +138,6 @@ fun AgentSimulationScreen(
                 visibleLogs.add(script.thinkingLogs[currentLogIndex])
                 currentLogIndex++
                 delay(400L)
-                if (visibleLogs.isNotEmpty()) {
-                    logListState.animateScrollToItem(visibleLogs.size - 1)
-                }
             }
 
             delay(800L)
@@ -179,6 +174,7 @@ fun AgentSimulationScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -190,7 +186,7 @@ fun AgentSimulationScreen(
                 isManageMode = isManageMode,
                 selectedItems = selectedItems,
                 toastMessage = toastMessage,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.height(420.dp)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -290,30 +286,26 @@ fun AgentSimulationScreen(
                         enter = expandVertically(),
                         exit = shrinkVertically()
                     ) {
-                        LazyColumn(
-                            state = logListState,
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(120.dp)
                                 .padding(horizontal = 12.dp)
                                 .padding(bottom = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            items(visibleLogs) { log ->
+                            visibleLogs.forEach { log ->
                                 ThinkingLogItem(log = log)
                             }
 
                             if (isRunning) {
-                                item {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "> ",
-                                            color = Color(0xFF00FF00),
-                                            fontSize = 12.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        BlinkingCursor()
-                                    }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "> ",
+                                        color = Color(0xFF00FF00),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    BlinkingCursor()
                                 }
                             }
                         }
