@@ -20,6 +20,7 @@ import com.example.prototypetesting.ui.screens.TestRunnerScreen
 import com.example.prototypetesting.ui.screens.UploadScreen
 import com.example.prototypetesting.ui.screens.VideoUploadScreen
 import com.example.prototypetesting.ui.screens.AiReportScreen
+import com.example.prototypetesting.ui.screens.AgentSimulationScreen
 
 @Composable
 fun NavGraph(navController: NavHostController) {
@@ -47,6 +48,18 @@ fun NavGraph(navController: NavHostController) {
         }
         composable(Screen.AiReport.route) {
             AiReportScreen(navController)
+        }
+        composable(
+            route = "${Screen.AgentSimulation.route}/{personaType}",
+            arguments = listOf(
+                navArgument("personaType") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val personaType = backStackEntry.arguments?.getString("personaType") ?: "elderly"
+            AgentSimulationScreen(
+                navController = navController,
+                personaType = personaType
+            )
         }
         composable(
             route = "${Screen.ProjectDetail.route}/{projectName}/{imageUris}",
