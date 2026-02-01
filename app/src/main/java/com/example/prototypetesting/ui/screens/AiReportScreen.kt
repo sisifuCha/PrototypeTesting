@@ -32,14 +32,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.navigation.NavController
+import com.example.prototypetesting.data.TimelineLoader
+import com.example.prototypetesting.ui.components.TimelineView
 import com.example.prototypetesting.ui.theme.BackgroundBlue
 import com.example.prototypetesting.ui.theme.PrimaryBlue
 import com.example.prototypetesting.ui.theme.TextPrimary
@@ -52,8 +56,10 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiReportScreen(navController: NavController) {
+    val context = LocalContext.current
     val reportContent = buildReportContent()
     val scope = rememberCoroutineScope()
+    val timelineData = remember { TimelineLoader.loadFromAssets(context) }
 
     Column(
         modifier = Modifier
@@ -182,6 +188,11 @@ fun AiReportScreen(navController: NavController) {
                         }
                     }
                 }
+            }
+
+            // 时间轴展示
+            timelineData?.let { data ->
+                TimelineView(timelineData = data)
             }
 
             ReportSection(
