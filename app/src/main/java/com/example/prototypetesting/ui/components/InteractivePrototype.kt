@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,13 +26,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.prototypetesting.data.ComponentType
 import com.example.prototypetesting.data.DemoScenarioData
 import com.example.prototypetesting.data.Hotspot
@@ -71,6 +74,8 @@ fun InteractivePrototype(
         }
     }
 
+    val context = LocalContext.current
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
@@ -84,12 +89,52 @@ fun InteractivePrototype(
                 }
             }
     ) {
-        // 背景图片
-        AsyncImage(
-            model = Uri.parse(imageUri),
+        // 背景图片 - 使用 SubcomposeAsyncImage 以便显示加载状态和错误状态
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(Uri.parse(imageUri))
+                .crossfade(true)
+                .build(),
             contentDescription = "原型图片",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            loading = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFF5F5F5)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = Color(0xFF00FF88),
+                        strokeWidth = 3.dp
+                    )
+                }
+            },
+            error = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFFAFAFA)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.BrokenImage,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "图片加载失败",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            }
         )
 
         // 热区覆盖层
