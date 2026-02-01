@@ -45,10 +45,8 @@ import com.example.prototypetesting.ui.theme.PrimaryBlue
 import com.example.prototypetesting.ui.theme.TextPrimary
 import com.example.prototypetesting.ui.theme.TextSecondary
 import com.example.prototypetesting.ui.theme.TextWhite
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,62 +56,21 @@ fun VideoUploadScreen(navController: NavController) {
     var faceVideoUri by remember { mutableStateOf<Uri?>(null) }
     var screenVideoUri by remember { mutableStateOf<Uri?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
-    var messageIndex by remember { mutableStateOf(0) }
-    var progressPercent by remember { mutableStateOf(0) }
-    var showCursor by remember { mutableStateOf(true) }
-    val messageAlpha = remember { Animatable(1f) }
     val progressAnim = remember { Animatable(0f) }
 
-    val analysisMessages = listOf(
-        "检测到用户正向情感波动、监测到视线搜索行为。",
-        "判定为“初次识别困惑”，正在计算犹豫时长...",
-        "用户成功通过登录关点，情绪效价转正。",
-        "预测用户意图为“查看产品详情”。",
-        "检测到无效点击 (Dead Click)。",
-        "捕捉到负面语音流：“点不动”。满意度骤降。",
-        "提示：正在融合面部/语音/操作数据，生成多模态可用性报告..."
-    )
-
     LaunchedEffect(isAnalyzing) {
         if (isAnalyzing) {
-            messageIndex = 0
-            progressPercent = 0
             progressAnim.snapTo(0f)
-            val stepDelayMs = 700L
-            val totalDurationMs = stepDelayMs * analysisMessages.size + 600L
-            coroutineScope {
-                launch {
-                    progressAnim.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(
-                            durationMillis = totalDurationMs.toInt(),
-                            easing = LinearEasing
-                        )
-                    )
-                }
-                launch {
-                    analysisMessages.indices.forEach { index ->
-                        messageAlpha.snapTo(0f)
-                        messageIndex = index
-                        messageAlpha.animateTo(1f, animationSpec = tween(280))
-                        delay(stepDelayMs - 280)
-                    }
-                }
-            }
-            delay(600L)
+            progressAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 3000,
+                    easing = LinearEasing
+                )
+            )
+            delay(300L)
             isAnalyzing = false
             navController.navigate("ai_report")
-        }
-    }
-
-    LaunchedEffect(isAnalyzing) {
-        if (isAnalyzing) {
-            while (isAnalyzing) {
-                showCursor = !showCursor
-                delay(350L)
-            }
-        } else {
-            showCursor = true
         }
     }
 
@@ -252,36 +209,27 @@ fun VideoUploadScreen(navController: NavController) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         CircularProgressIndicator(color = PrimaryBlue, strokeWidth = 3.dp)
                         Text(
-                            text = "${(progressAnim.value * 100).toInt()}%",
-                            fontSize = 14.sp,
+                            text = "AI 正在分析中...",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = PrimaryBlue
+                            color = TextPrimary
                         )
                         LinearProgressIndicator(
-                            progress = progressAnim.value,
+                            progress = { progressAnim.value },
                             color = PrimaryBlue,
                             trackColor = PrimaryBlue.copy(alpha = 0.2f),
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            text = "AI 正在分析中...",
+                            text = "${(progressAnim.value * 100).toInt()}%",
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = buildString {
-                                append(analysisMessages.getOrElse(messageIndex) { "" })
-                                if (showCursor) append(" |")
-                            },
-                            fontSize = 13.sp,
-                            color = TextSecondary.copy(alpha = messageAlpha.value)
+                            color = TextSecondary
                         )
                     }
                 }
