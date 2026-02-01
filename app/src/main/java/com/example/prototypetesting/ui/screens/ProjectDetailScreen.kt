@@ -22,8 +22,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.prototypetesting.data.DemoScenarioData
 import com.example.prototypetesting.data.Hotspot
 import com.example.prototypetesting.data.RecognitionStats
@@ -473,6 +475,7 @@ private fun MiniPageThumbnail(
     onClick: () -> Unit
 ) {
     val pageName = DemoScenarioData.demoPages.getOrNull(pageIndex)?.name ?: "页面${pageIndex + 1}"
+    val context = LocalContext.current
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
@@ -489,11 +492,26 @@ private fun MiniPageThumbnail(
                 )
                 .clickable(onClick = onClick)
         ) {
-            AsyncImage(
-                model = Uri.parse(imageUri),
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(Uri.parse(imageUri))
+                    .crossfade(true)
+                    .build(),
                 contentDescription = pageName,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                loading = {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color(0xFF00FF88),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
             )
         }
 
@@ -787,6 +805,8 @@ fun ScreenThumbnail(
     onClick: () -> Unit,
     imageUri: String? = null
 ) {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .width(60.dp)
@@ -801,10 +821,14 @@ fun ScreenThumbnail(
             .clickable(onClick = onClick)
     ) {
         if (imageUri != null) {
-            AsyncImage(
-                model = Uri.parse(imageUri),
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(Uri.parse(imageUri))
+                    .crossfade(true)
+                    .build(),
                 contentDescription = "页面${index + 1}",
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
         }
     }
