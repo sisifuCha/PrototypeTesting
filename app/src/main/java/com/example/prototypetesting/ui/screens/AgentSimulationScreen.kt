@@ -443,15 +443,15 @@ private fun ShoppingCartStage(
                                 Button(
                                     onClick = {},
                                     enabled = false,
-                                    modifier = Modifier.height(36.dp),
-                                    shape = RoundedCornerShape(18.dp),
+                                    modifier = Modifier.height(32.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         disabledContainerColor = Color(0xFFF44336),
                                         disabledContentColor = Color.White
                                     ),
-                                    contentPadding = PaddingValues(horizontal = 20.dp)
+                                    contentPadding = PaddingValues(horizontal = 12.dp)
                                 ) {
-                                    Text("结算(3)", fontSize = 13.sp)
+                                    Text("结算(3)", fontSize = 11.sp)
                                 }
                             }
                         }
