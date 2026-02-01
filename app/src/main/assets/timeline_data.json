@@ -1,0 +1,149 @@
+{
+  "totalDurationSeconds": 225,
+  "events": [
+    {
+      "timeSeconds": 0,
+      "userAction": {
+        "type": "start",
+        "target": "应用启动",
+        "description": "打开应用"
+      },
+      "userState": {
+        "emotion": "neutral",
+        "description": "开始测试，表情平静"
+      }
+    },
+    {
+      "timeSeconds": 15,
+      "userAction": {
+        "type": "click",
+        "target": "登录按钮",
+        "description": "寻找并点击登录按钮"
+      },
+      "userState": {
+        "emotion": "confused",
+        "description": "略显犹豫，寻找按钮位置"
+      }
+    },
+    {
+      "timeSeconds": 35,
+      "userAction": {
+        "type": "input",
+        "target": "用户名输入框",
+        "description": "输入用户名"
+      },
+      "userState": {
+        "emotion": "focused",
+        "description": "专注输入信息"
+      }
+    },
+    {
+      "timeSeconds": 58,
+      "userAction": {
+        "type": "click",
+        "target": "提交按钮",
+        "description": "点击提交登录"
+      },
+      "userState": {
+        "emotion": "neutral",
+        "description": "等待响应"
+      }
+    },
+    {
+      "timeSeconds": 75,
+      "userAction": {
+        "type": "scroll",
+        "target": "商品列表",
+        "description": "浏览商品列表"
+      },
+      "userState": {
+        "emotion": "interested",
+        "description": "表现出浏览兴趣"
+      }
+    },
+    {
+      "timeSeconds": 102,
+      "userAction": {
+        "type": "click",
+        "target": "商品详情",
+        "description": "点击查看商品详情"
+      },
+      "userState": {
+        "emotion": "positive",
+        "description": "对商品感兴趣"
+      }
+    },
+    {
+      "timeSeconds": 125,
+      "userAction": {
+        "type": "misclick",
+        "target": "图片区域",
+        "description": "误触图片放大区域"
+      },
+      "userState": {
+        "emotion": "frustrated",
+        "description": "误触后表情困惑"
+      }
+    },
+    {
+      "timeSeconds": 130,
+      "userAction": {
+        "type": "click",
+        "target": "返回按钮",
+        "description": "点击返回修正路径"
+      },
+      "userState": {
+        "emotion": "relieved",
+        "description": "快速恢复，找到正确路径"
+      }
+    },
+    {
+      "timeSeconds": 158,
+      "userAction": {
+        "type": "click",
+        "target": "加入购物车",
+        "description": "添加商品到购物车"
+      },
+      "userState": {
+        "emotion": "satisfied",
+        "description": "操作顺利，满意度提升"
+      }
+    },
+    {
+      "timeSeconds": 185,
+      "userAction": {
+        "type": "click",
+        "target": "结算按钮",
+        "description": "进入结算流程"
+      },
+      "userState": {
+        "emotion": "focused",
+        "description": "专注完成购买"
+      }
+    },
+    {
+      "timeSeconds": 210,
+      "userAction": {
+        "type": "click",
+        "target": "确认订单",
+        "description": "确认并提交订单"
+      },
+      "userState": {
+        "emotion": "happy",
+        "description": "任务完成，正向情绪峰值"
+      }
+    },
+    {
+      "timeSeconds": 225,
+      "userAction": {
+        "type": "end",
+        "target": "测试结束",
+        "description": "完成测试流程"
+      },
+      "userState": {
+        "emotion": "positive",
+        "description": "整体体验良好"
+      }
+    }
+  ]
+}
