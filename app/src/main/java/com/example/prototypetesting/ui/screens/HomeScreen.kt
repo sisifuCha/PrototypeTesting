@@ -95,7 +95,7 @@ fun HomeHeader() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
@@ -136,7 +136,7 @@ fun HomeHeader() {
                     )
                 }
             }
-            
+
             Box(
                 modifier = Modifier
                     .size(40.dp)

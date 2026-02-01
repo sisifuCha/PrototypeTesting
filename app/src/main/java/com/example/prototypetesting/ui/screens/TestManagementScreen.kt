@@ -108,7 +108,7 @@ fun TestManagementHeader(navController: NavController) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
@@ -134,7 +134,7 @@ fun TestManagementHeader(navController: NavController) {
                     )
                 }
             }
-            
+
             Button(
                 onClick = { navController.navigate("video_upload") },
                 colors = ButtonDefaults.buttonColors(
