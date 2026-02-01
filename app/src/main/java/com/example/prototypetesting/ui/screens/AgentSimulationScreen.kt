@@ -1,6 +1,9 @@
 package com.example.prototypetesting.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -20,10 +23,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,10 +35,6 @@ import com.example.prototypetesting.data.*
 import com.example.prototypetesting.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,24 +50,20 @@ fun AgentSimulationScreen(
     val script = SimulationScripts.getScript(persona)
 
     var isRunning by remember { mutableStateOf(false) }
-    var currentActionIndex by remember { mutableIntStateOf(-1) }
     var currentLogIndex by remember { mutableIntStateOf(-1) }
     var cursorPosition by remember { mutableStateOf(Offset(0.5f, 0.1f)) }
     var showCursor by remember { mutableStateOf(false) }
 
-    // 伪 UI 状态
-    var usernameText by remember { mutableStateOf("") }
-    var passwordText by remember { mutableStateOf("") }
-    var activeField by remember { mutableStateOf<String?>(null) }
+    // 购物车 UI 状态
+    var showMenu by remember { mutableStateOf(false) }
+    var isManageMode by remember { mutableStateOf(false) }
+    var selectedItems by remember { mutableStateOf(setOf<Int>()) }
     var toastMessage by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
-    var isTyping by remember { mutableStateOf(false) }
-
-    // 抖动动画
-    var jitterOffset by remember { mutableStateOf(Offset.Zero) }
 
     // 思维链日志
     val visibleLogs = remember { mutableStateListOf<ThinkingLog>() }
     val logListState = rememberLazyListState()
+    var isLogExpanded by remember { mutableStateOf(true) }
 
     // 动画
     val cursorAnimX = remember { Animatable(0.5f) }
@@ -79,17 +74,13 @@ fun AgentSimulationScreen(
     LaunchedEffect(isRunning) {
         if (isRunning) {
             showCursor = true
-            currentActionIndex = 0
             currentLogIndex = 0
 
-            for ((index, action) in script.actions.withIndex()) {
-                currentActionIndex = index
-
+            for (action in script.actions) {
                 // 同步显示思维链日志
                 if (currentLogIndex < script.thinkingLogs.size) {
                     visibleLogs.add(script.thinkingLogs[currentLogIndex])
                     currentLogIndex++
-                    // 自动滚动到底部
                     if (visibleLogs.isNotEmpty()) {
                         logListState.animateScrollToItem(visibleLogs.size - 1)
                     }
@@ -97,57 +88,25 @@ fun AgentSimulationScreen(
 
                 when (action) {
                     is SimulationAction.MoveTo -> {
-                        // 移动光标
                         cursorAnimX.animateTo(
                             targetValue = action.target.x,
                             animationSpec = tween(
                                 durationMillis = persona.cursorSpeed.toInt(),
-                                easing = if (persona == AgentPersona.ELDERLY) LinearEasing else FastOutSlowInEasing
+                                easing = FastOutSlowInEasing
                             )
                         )
                         cursorAnimY.animateTo(
                             targetValue = action.target.y,
                             animationSpec = tween(
                                 durationMillis = persona.cursorSpeed.toInt(),
-                                easing = if (persona == AgentPersona.ELDERLY) LinearEasing else FastOutSlowInEasing
+                                easing = FastOutSlowInEasing
                             )
                         )
                         cursorPosition = Offset(cursorAnimX.value, cursorAnimY.value)
                     }
 
-                    is SimulationAction.Jitter -> {
-                        if (persona.hasJitter) {
-                            // 模拟手抖
-                            repeat(5) {
-                                val angle = Random.nextFloat() * 360f
-                                val distance = Random.nextFloat() * 0.02f
-                                jitterOffset = Offset(
-                                    cos(Math.toRadians(angle.toDouble())).toFloat() * distance,
-                                    sin(Math.toRadians(angle.toDouble())).toFloat() * distance
-                                )
-                                delay(100L)
-                            }
-                            jitterOffset = Offset.Zero
-                        }
-                    }
-
                     is SimulationAction.Click -> {
-                        // 点击效果
-                        activeField = action.targetName
-                        delay(200L)
-                    }
-
-                    is SimulationAction.TypeText -> {
-                        isTyping = true
-                        // 逐字输入
-                        for (char in action.text) {
-                            when (activeField) {
-                                "用户名输入框" -> usernameText += char
-                                "密码输入框" -> passwordText += char
-                            }
-                            delay(persona.typeSpeed)
-                        }
-                        isTyping = false
+                        delay(150L)
                     }
 
                     is SimulationAction.Wait -> {
@@ -156,9 +115,23 @@ fun AgentSimulationScreen(
 
                     is SimulationAction.ShowToast -> {
                         toastMessage = action.message to action.isError
-                        delay(2000L)
+                        delay(1500L)
                         toastMessage = null
                     }
+
+                    is SimulationAction.ShowMenu -> {
+                        showMenu = action.show
+                    }
+
+                    is SimulationAction.ToggleManageMode -> {
+                        isManageMode = action.enabled
+                    }
+
+                    is SimulationAction.SelectItem -> {
+                        selectedItems = selectedItems + action.index
+                    }
+
+                    else -> {}
                 }
             }
 
@@ -166,14 +139,15 @@ fun AgentSimulationScreen(
             while (currentLogIndex < script.thinkingLogs.size) {
                 visibleLogs.add(script.thinkingLogs[currentLogIndex])
                 currentLogIndex++
-                delay(500L)
+                delay(400L)
                 if (visibleLogs.isNotEmpty()) {
                     logListState.animateScrollToItem(visibleLogs.size - 1)
                 }
             }
 
-            delay(1000L)
+            delay(800L)
             isRunning = false
+            showCursor = false
         }
     }
 
@@ -202,127 +176,144 @@ fun AgentSimulationScreen(
             )
         )
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 左侧：仿真舞台
-            Column(
-                modifier = Modifier.weight(0.45f),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // 仿真舞台
+            ShoppingCartStage(
+                cursorPosition = Offset(cursorAnimX.value, cursorAnimY.value),
+                showCursor = showCursor,
+                showMenu = showMenu,
+                isManageMode = isManageMode,
+                selectedItems = selectedItems,
+                toastMessage = toastMessage,
+                modifier = Modifier.weight(1f)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 开始按钮
+            Button(
+                onClick = {
+                    // 重置状态
+                    showMenu = false
+                    isManageMode = false
+                    selectedItems = emptySet()
+                    toastMessage = null
+                    visibleLogs.clear()
+                    currentLogIndex = 0
+                    coroutineScope.launch {
+                        cursorAnimX.snapTo(0.5f)
+                        cursorAnimY.snapTo(0.1f)
+                    }
+                    isRunning = true
+                },
+                enabled = !isRunning,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRunning) TextSecondary else PrimaryBlue
+                )
             ) {
+                Icon(
+                    imageVector = if (isRunning) Icons.Default.PlayArrow else Icons.Default.PlayCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "仿真舞台",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    text = if (isRunning) "仿真进行中..." else "开始仿真",
+                    fontSize = 15.sp
                 )
-
-                SimulationStage(
-                    cursorPosition = Offset(
-                        cursorAnimX.value + jitterOffset.x,
-                        cursorAnimY.value + jitterOffset.y
-                    ),
-                    showCursor = showCursor,
-                    usernameText = usernameText,
-                    passwordText = passwordText,
-                    activeField = activeField,
-                    toastMessage = toastMessage,
-                    isTyping = isTyping
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 开始按钮
-                Button(
-                    onClick = {
-                        // 重置状态
-                        usernameText = ""
-                        passwordText = ""
-                        activeField = null
-                        toastMessage = null
-                        visibleLogs.clear()
-                        currentLogIndex = 0
-                        coroutineScope.launch {
-                            cursorAnimX.snapTo(0.5f)
-                            cursorAnimY.snapTo(0.1f)
-                        }
-                        isRunning = true
-                    },
-                    enabled = !isRunning,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isRunning) TextSecondary else PrimaryBlue
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isRunning) Icons.Default.PlayArrow else Icons.Default.PlayCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRunning) "仿真进行中..." else "开始仿真",
-                        fontSize = 14.sp
-                    )
-                }
             }
 
-            // 右侧：思维链日志
-            Column(
-                modifier = Modifier.weight(0.55f)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 可折叠的思维链日志
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Psychology,
-                        contentDescription = null,
-                        tint = PrimaryBlue,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Agent 思维链",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = TextPrimary
-                    )
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
-                ) {
-                    LazyColumn(
-                        state = logListState,
+                Column {
+                    // 折叠头部
+                    Row(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        items(visibleLogs) { log ->
-                            ThinkingLogItem(log = log)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = null,
+                                tint = Color(0xFF00FF00),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Agent 思维链",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White
+                            )
+                            if (visibleLogs.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "(${visibleLogs.size})",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF888888)
+                                )
+                            }
                         }
+                        IconButton(
+                            onClick = { isLogExpanded = !isLogExpanded },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isLogExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isLogExpanded) "收起" else "展开",
+                                tint = Color(0xFF888888)
+                            )
+                        }
+                    }
 
-                        if (isRunning) {
-                            item {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "> ",
-                                        color = Color(0xFF00FF00),
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    BlinkingCursor()
+                    // 可折叠内容
+                    AnimatedVisibility(
+                        visible = isLogExpanded,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        LazyColumn(
+                            state = logListState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(visibleLogs) { log ->
+                                ThinkingLogItem(log = log)
+                            }
+
+                            if (isRunning) {
+                                item {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "> ",
+                                            color = Color(0xFF00FF00),
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        BlinkingCursor()
+                                    }
                                 }
                             }
                         }
@@ -334,157 +325,194 @@ fun AgentSimulationScreen(
 }
 
 @Composable
-private fun SimulationStage(
+private fun ShoppingCartStage(
     cursorPosition: Offset,
     showCursor: Boolean,
-    usernameText: String,
-    passwordText: String,
-    activeField: String?,
+    showMenu: Boolean,
+    isManageMode: Boolean,
+    selectedItems: Set<Int>,
     toastMessage: Pair<String, Boolean>?,
-    isTyping: Boolean
+    modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-
     Card(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(9f / 16f)
-            .fillMaxHeight(0.7f)
-            .shadow(8.dp, RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+            .shadow(8.dp, RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // 伪 UI 内容
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(40.dp))
-
-                // Logo
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 顶部栏
                 Box(
                     modifier = Modifier
-                        .size(60.dp)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(PrimaryBlue, Color(0xFF64B5F6))
-                            ),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
+                    Text(
+                        text = "购物车",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    // 右上角更多按钮
                     Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "更多",
+                        tint = TextPrimary,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .align(Alignment.CenterEnd)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // 商品列表
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CartItemCard(
+                        name = "无线蓝牙耳机",
+                        price = "¥299",
+                        originalPrice = "¥399",
+                        imageColor = Color(0xFF5C6BC0),
+                        isManageMode = isManageMode,
+                        isSelected = selectedItems.contains(0)
+                    )
+                    CartItemCard(
+                        name = "手机支架",
+                        price = "¥39",
+                        originalPrice = "¥59",
+                        imageColor = Color(0xFF26A69A),
+                        isManageMode = isManageMode,
+                        isSelected = selectedItems.contains(1)
+                    )
+                    CartItemCard(
+                        name = "充电宝 20000mAh",
+                        price = "¥129",
+                        originalPrice = "¥169",
+                        imageColor = Color(0xFFEF5350),
+                        isManageMode = isManageMode,
+                        isSelected = selectedItems.contains(2)
+                    )
+                }
 
-                Text(
-                    text = "用户登录",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 用户名输入框 (位置约 0.3)
-                OutlinedTextField(
-                    value = usernameText,
-                    onValueChange = {},
-                    enabled = false,
-                    label = { Text("用户名", fontSize = 12.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = TextPrimary,
-                        disabledBorderColor = if (activeField == "用户名输入框") PrimaryBlue else Color(0xFFE0E0E0),
-                        disabledLabelColor = TextSecondary
-                    ),
-                    trailingIcon = {
-                        if (activeField == "用户名输入框" && isTyping) {
-                            BlinkingCursor(color = TextPrimary)
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 密码输入框 (位置约 0.45)
-                OutlinedTextField(
-                    value = "*".repeat(passwordText.length),
-                    onValueChange = {},
-                    enabled = false,
-                    label = { Text("密码", fontSize = 12.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = TextPrimary,
-                        disabledBorderColor = if (activeField == "密码输入框") PrimaryBlue else Color(0xFFE0E0E0),
-                        disabledLabelColor = TextSecondary
-                    ),
-                    trailingIcon = {
-                        if (activeField == "密码输入框" && isTyping) {
-                            BlinkingCursor(color = TextPrimary)
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // 登录按钮 (位置约 0.62)
-                Button(
-                    onClick = {},
-                    enabled = false,
+                // 底部操作栏
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = PrimaryBlue,
-                        disabledContentColor = Color.White
-                    )
+                        .background(Color.White)
+                        .padding(12.dp)
                 ) {
-                    Text(text = "登 录", fontSize = 16.sp)
+                    if (isManageMode) {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                disabledContainerColor = Color(0xFFF44336),
+                                disabledContentColor = Color.White
+                            )
+                        ) {
+                            Text("删除所选", fontSize = 14.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = false,
+                                    onCheckedChange = {},
+                                    enabled = false,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("全选", fontSize = 12.sp, color = TextSecondary)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("合计: ", fontSize = 12.sp, color = TextSecondary)
+                                Text(
+                                    "¥467",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF44336)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Button(
+                                    onClick = {},
+                                    enabled = false,
+                                    modifier = Modifier.height(36.dp),
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        disabledContainerColor = Color(0xFFF44336),
+                                        disabledContentColor = Color.White
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 20.dp)
+                                ) {
+                                    Text("结算(3)", fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "忘记密码?",
-                    fontSize = 12.sp,
-                    color = PrimaryBlue
-                )
+            // 下拉菜单
+            if (showMenu) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 40.dp, end = 8.dp)
+                        .width(120.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(4.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = TextPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("管理购物车", fontSize = 13.sp, color = TextPrimary)
+                        }
+                    }
+                }
             }
 
             // Toast 消息
             toastMessage?.let { (message, isError) ->
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 80.dp)
+                        .align(Alignment.Center)
                         .background(
-                            if (isError) Color(0xFFFFEBEE) else Color(0xFFE8F5E9),
+                            Color.Black.copy(alpha = 0.7f),
                             RoundedCornerShape(8.dp)
                         )
-                        .border(
-                            1.dp,
-                            if (isError) Color(0xFFF44336) else Color(0xFF4CAF50),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
                     Text(
                         text = message,
-                        fontSize = 12.sp,
-                        color = if (isError) Color(0xFFC62828) else Color(0xFF2E7D32),
-                        fontWeight = FontWeight.Medium
+                        fontSize = 13.sp,
+                        color = Color.White
                     )
                 }
             }
@@ -500,24 +528,111 @@ private fun SimulationStage(
                         modifier = Modifier
                             .offset { IntOffset(offsetX.roundToPx(), offsetY.roundToPx()) }
                     ) {
-                        // 手指图标
                         Text(
                             text = "\uD83D\uDC46",
-                            fontSize = 28.sp,
-                            modifier = Modifier.offset(x = (-14).dp, y = (-28).dp)
-                        )
-                        // 点击涟漪效果
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .offset(x = (-6).dp, y = (-6).dp)
-                                .background(
-                                    PrimaryBlue.copy(alpha = 0.3f),
-                                    CircleShape
-                                )
+                            fontSize = 24.sp,
+                            modifier = Modifier.offset(x = (-12).dp, y = (-24).dp)
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartItemCard(
+    name: String,
+    price: String,
+    originalPrice: String,
+    imageColor: Color,
+    isManageMode: Boolean,
+    isSelected: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isManageMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = {},
+                    enabled = false,
+                    modifier = Modifier.size(20.dp),
+                    colors = CheckboxDefaults.colors(
+                        disabledCheckedColor = PrimaryBlue,
+                        disabledUncheckedColor = Color(0xFFBDBDBD)
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            // 商品图片占位
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(imageColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ShoppingBag,
+                    contentDescription = null,
+                    tint = imageColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = price,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFF44336)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = originalPrice,
+                        fontSize = 11.sp,
+                        color = Color(0xFFBDBDBD),
+                        textDecoration = TextDecoration.LineThrough
+                    )
+                }
+            }
+
+            // 数量选择器
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .background(Color(0xFFF5F5F5), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("-", fontSize = 14.sp, color = TextSecondary)
+                Text(
+                    "1",
+                    fontSize = 12.sp,
+                    color = TextPrimary,
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
+                Text("+", fontSize = 14.sp, color = TextSecondary)
             }
         }
     }
@@ -532,37 +647,31 @@ private fun ThinkingLogItem(log: ThinkingLog) {
         ThinkingLogType.DECISION -> "[决策]" to Color(0xFF81C784)
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "> ",
             color = Color(0xFF00FF00),
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontFamily = FontFamily.Monospace
         )
         Text(
             text = prefix,
             color = color,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = " ",
-            fontSize = 12.sp
-        )
-        Text(
-            text = log.content,
+            text = " ${log.content}",
             color = Color(0xFFE0E0E0),
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontFamily = FontFamily.Monospace
         )
     }
 }
 
 @Composable
-private fun BlinkingCursor(color: Color = Color(0xFF00FF00)) {
+private fun BlinkingCursor() {
     val infiniteTransition = rememberInfiniteTransition(label = "cursor")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -576,8 +685,8 @@ private fun BlinkingCursor(color: Color = Color(0xFF00FF00)) {
 
     Text(
         text = "_",
-        color = color.copy(alpha = alpha),
-        fontSize = 12.sp,
+        color = Color(0xFF00FF00).copy(alpha = alpha),
+        fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,
         fontWeight = FontWeight.Bold
     )

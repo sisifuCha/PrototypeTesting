@@ -20,9 +20,9 @@ enum class AgentPersona(
         displayName = "银发族",
         icon = "\uD83D\uDC74",
         description = "60岁以上，对数字产品不熟悉",
-        cursorSpeed = 2000L,
-        hasJitter = true,
-        typeSpeed = 500L
+        cursorSpeed = 800L,
+        hasJitter = false,
+        typeSpeed = 300L
     ),
     YOUTH(
         displayName = "数字原住民",
@@ -36,7 +36,7 @@ enum class AgentPersona(
         displayName = "职场白领",
         icon = "\uD83D\uDC69\u200D\uD83D\uDCBC",
         description = "追求效率，注重用户体验",
-        cursorSpeed = 500L,
+        cursorSpeed = 400L,
         hasJitter = false,
         typeSpeed = 120L
     )
@@ -49,7 +49,9 @@ sealed class SimulationAction {
     data class TypeText(val text: String, val targetName: String) : SimulationAction()
     data class Wait(val durationMs: Long) : SimulationAction()
     data class ShowToast(val message: String, val isError: Boolean = false) : SimulationAction()
-    object Jitter : SimulationAction()
+    data class SelectItem(val index: Int) : SimulationAction()  // 选中商品
+    data class ShowMenu(val show: Boolean) : SimulationAction() // 显示菜单
+    data class ToggleManageMode(val enabled: Boolean) : SimulationAction() // 切换管理模式
 }
 
 // 思维链日志
@@ -76,72 +78,99 @@ data class SimulationScript(
 // 预定义剧本
 object SimulationScripts {
 
-    // 银发族剧本 - 失败场景
+    // 银发族剧本 - 购物车删除场景
     val elderlyScript = SimulationScript(
         persona = AgentPersona.ELDERLY,
         actions = listOf(
-            SimulationAction.Wait(1000L),
-            SimulationAction.MoveTo(Offset(0.5f, 0.3f), "用户名输入框"),
-            SimulationAction.Jitter,
-            SimulationAction.Click("用户名输入框"),
             SimulationAction.Wait(800L),
-            SimulationAction.TypeText("zhang", "用户名输入框"),
-            SimulationAction.Wait(1500L),
-            SimulationAction.MoveTo(Offset(0.5f, 0.45f), "密码输入框"),
-            SimulationAction.Jitter,
-            SimulationAction.Click("密码输入框"),
+            // 1. 先点击商品本身，想找删除按钮
+            SimulationAction.MoveTo(Offset(0.5f, 0.35f), "商品1"),
+            SimulationAction.Click("商品1"),
+            SimulationAction.Wait(1000L),
+            // 2. 再点击另一个商品
+            SimulationAction.MoveTo(Offset(0.5f, 0.55f), "商品2"),
+            SimulationAction.Click("商品2"),
+            SimulationAction.Wait(800L),
+            // 3. 尝试点击价格区域
+            SimulationAction.MoveTo(Offset(0.8f, 0.35f), "价格区域"),
+            SimulationAction.Click("价格区域"),
             SimulationAction.Wait(600L),
-            // 没有输入密码，直接点击登录
-            SimulationAction.MoveTo(Offset(0.5f, 0.62f), "登录按钮"),
-            SimulationAction.Jitter,
-            SimulationAction.Wait(1200L),
-            SimulationAction.Click("登录按钮"),
-            SimulationAction.ShowToast("错误：未检测到密码输入", true),
-            SimulationAction.Wait(2000L)
+            // 4. 终于发现右上角有个菜单按钮
+            SimulationAction.MoveTo(Offset(0.92f, 0.08f), "更多菜单"),
+            SimulationAction.Wait(500L),
+            SimulationAction.Click("更多菜单"),
+            SimulationAction.ShowMenu(true),
+            SimulationAction.Wait(800L),
+            // 5. 点击管理购物车
+            SimulationAction.MoveTo(Offset(0.75f, 0.18f), "管理购物车"),
+            SimulationAction.Click("管理购物车"),
+            SimulationAction.ShowMenu(false),
+            SimulationAction.ToggleManageMode(true),
+            SimulationAction.Wait(600L),
+            // 6. 选中要删除的商品
+            SimulationAction.MoveTo(Offset(0.08f, 0.35f), "选择框1"),
+            SimulationAction.Click("选择框1"),
+            SimulationAction.SelectItem(0),
+            SimulationAction.Wait(500L),
+            // 7. 点击删除按钮
+            SimulationAction.MoveTo(Offset(0.5f, 0.88f), "删除按钮"),
+            SimulationAction.Click("删除按钮"),
+            SimulationAction.ShowToast("删除成功", false),
+            SimulationAction.Wait(1000L)
         ),
         thinkingLogs = listOf(
-            ThinkingLog("正在扫描界面元素...", ThinkingLogType.OBSERVATION),
-            ThinkingLog("字体大小 12sp < 认知阈值 16sp", ThinkingLogType.ANALYSIS),
-            ThinkingLog("输入框边界不够明显", ThinkingLogType.OBSERVATION),
-            ThinkingLog("尝试点击用户名区域", ThinkingLogType.DECISION),
-            ThinkingLog("手指精确度下降，需要调整位置", ThinkingLogType.OBSERVATION),
-            ThinkingLog("逐字输入中...", ThinkingLogType.OBSERVATION),
-            ThinkingLog("未发现明确的引导标识", ThinkingLogType.ANALYSIS),
-            ThinkingLog("情感状态: 焦虑 (Anxiety Level: High)", ThinkingLogType.EMOTION),
-            ThinkingLog("跳过密码输入，尝试直接登录", ThinkingLogType.DECISION),
-            ThinkingLog("操作失败，界面反馈不明确", ThinkingLogType.OBSERVATION),
-            ThinkingLog("情感状态: 沮丧 (Frustration Level: Critical)", ThinkingLogType.EMOTION),
-            ThinkingLog("放弃任务", ThinkingLogType.DECISION)
+            ThinkingLog("目标：删除购物车中不需要的商品", ThinkingLogType.DECISION),
+            ThinkingLog("正在扫描界面...", ThinkingLogType.OBSERVATION),
+            ThinkingLog("点击商品，寻找删除入口", ThinkingLogType.DECISION),
+            ThinkingLog("没有发现删除按钮", ThinkingLogType.OBSERVATION),
+            ThinkingLog("情感状态: 疑惑 (Confused)", ThinkingLogType.EMOTION),
+            ThinkingLog("尝试点击其他商品", ThinkingLogType.DECISION),
+            ThinkingLog("仍未发现删除功能", ThinkingLogType.OBSERVATION),
+            ThinkingLog("情感状态: 困惑加深", ThinkingLogType.EMOTION),
+            ThinkingLog("开始探索界面其他区域...", ThinkingLogType.DECISION),
+            ThinkingLog("发现右上角有个菜单图标", ThinkingLogType.OBSERVATION),
+            ThinkingLog("点击菜单查看选项", ThinkingLogType.DECISION),
+            ThinkingLog("发现\"管理购物车\"选项！", ThinkingLogType.OBSERVATION),
+            ThinkingLog("情感状态: 豁然开朗", ThinkingLogType.EMOTION),
+            ThinkingLog("进入管理模式", ThinkingLogType.DECISION),
+            ThinkingLog("出现了选择框，可以勾选商品", ThinkingLogType.OBSERVATION),
+            ThinkingLog("勾选要删除的商品", ThinkingLogType.DECISION),
+            ThinkingLog("点击底部删除按钮", ThinkingLogType.DECISION),
+            ThinkingLog("删除成功！任务完成", ThinkingLogType.OBSERVATION),
+            ThinkingLog("情感状态: 满意 (Satisfied)", ThinkingLogType.EMOTION)
         ),
-        isSuccess = false
+        isSuccess = true
     )
 
-    // 年轻人剧本 - 成功场景
+    // 年轻人剧本 - 快速完成
     val youthScript = SimulationScript(
         persona = AgentPersona.YOUTH,
         actions = listOf(
             SimulationAction.Wait(300L),
-            SimulationAction.MoveTo(Offset(0.5f, 0.3f), "用户名输入框"),
-            SimulationAction.Click("用户名输入框"),
-            SimulationAction.TypeText("test_user", "用户名输入框"),
-            SimulationAction.MoveTo(Offset(0.5f, 0.45f), "密码输入框"),
-            SimulationAction.Click("密码输入框"),
-            SimulationAction.TypeText("password123", "密码输入框"),
-            SimulationAction.MoveTo(Offset(0.5f, 0.62f), "登录按钮"),
-            SimulationAction.Click("登录按钮"),
-            SimulationAction.Wait(500L),
-            SimulationAction.ShowToast("登录成功！", false),
-            SimulationAction.Wait(1000L)
+            SimulationAction.MoveTo(Offset(0.92f, 0.08f), "更多菜单"),
+            SimulationAction.Click("更多菜单"),
+            SimulationAction.ShowMenu(true),
+            SimulationAction.Wait(300L),
+            SimulationAction.MoveTo(Offset(0.75f, 0.18f), "管理购物车"),
+            SimulationAction.Click("管理购物车"),
+            SimulationAction.ShowMenu(false),
+            SimulationAction.ToggleManageMode(true),
+            SimulationAction.Wait(200L),
+            SimulationAction.MoveTo(Offset(0.08f, 0.35f), "选择框1"),
+            SimulationAction.Click("选择框1"),
+            SimulationAction.SelectItem(0),
+            SimulationAction.Wait(200L),
+            SimulationAction.MoveTo(Offset(0.5f, 0.88f), "删除按钮"),
+            SimulationAction.Click("删除按钮"),
+            SimulationAction.ShowToast("删除成功", false),
+            SimulationAction.Wait(500L)
         ),
         thinkingLogs = listOf(
-            ThinkingLog("界面布局清晰，标准登录表单", ThinkingLogType.OBSERVATION),
-            ThinkingLog("快速定位输入区域", ThinkingLogType.DECISION),
-            ThinkingLog("输入用户名", ThinkingLogType.OBSERVATION),
-            ThinkingLog("切换到密码框", ThinkingLogType.DECISION),
-            ThinkingLog("输入密码", ThinkingLogType.OBSERVATION),
-            ThinkingLog("情感状态: 平静 (Calm)", ThinkingLogType.EMOTION),
-            ThinkingLog("点击登录按钮", ThinkingLogType.DECISION),
-            ThinkingLog("任务完成", ThinkingLogType.OBSERVATION)
+            ThinkingLog("目标：删除购物车商品", ThinkingLogType.DECISION),
+            ThinkingLog("直接找菜单入口", ThinkingLogType.DECISION),
+            ThinkingLog("进入管理模式", ThinkingLogType.DECISION),
+            ThinkingLog("勾选并删除", ThinkingLogType.DECISION),
+            ThinkingLog("完成", ThinkingLogType.OBSERVATION)
         ),
         isSuccess = true
     )
@@ -150,7 +179,7 @@ object SimulationScripts {
         return when (persona) {
             AgentPersona.ELDERLY -> elderlyScript
             AgentPersona.YOUTH -> youthScript
-            AgentPersona.PROFESSIONAL -> youthScript // 复用年轻人剧本
+            AgentPersona.PROFESSIONAL -> youthScript
         }
     }
 }
