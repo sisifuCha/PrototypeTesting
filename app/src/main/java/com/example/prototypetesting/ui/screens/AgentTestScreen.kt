@@ -44,7 +44,7 @@ fun AgentTestScreen(navController: NavController) {
         }
         
         item {
-            TestProjectsSection()
+            TestProjectsSection(navController = navController)
         }
     }
 }
@@ -297,7 +297,7 @@ fun PersonaCard(persona: UserPersona, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun TestProjectsSection() {
+fun TestProjectsSection(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -310,18 +310,21 @@ fun TestProjectsSection() {
             fontWeight = FontWeight.Bold,
             color = TextPrimary
         )
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         SampleData.projects.forEach { project ->
-            ProjectTestItem(project = project)
+            ProjectTestItem(project = project, navController = navController)
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-fun ProjectTestItem(project: com.example.prototypetesting.data.Project) {
+fun ProjectTestItem(
+    project: com.example.prototypetesting.data.Project,
+    navController: NavController
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -348,9 +351,9 @@ fun ProjectTestItem(project: com.example.prototypetesting.data.Project) {
                     modifier = Modifier.size(24.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = project.name,
@@ -365,9 +368,9 @@ fun ProjectTestItem(project: com.example.prototypetesting.data.Project) {
                     color = TextSecondary
                 )
             }
-            
+
             Button(
-                onClick = { },
+                onClick = { navController.navigate("agent_simulation/elderly") },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryBlue
                 ),
