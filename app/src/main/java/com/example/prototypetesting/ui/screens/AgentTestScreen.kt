@@ -86,7 +86,7 @@ fun AgentTestHeader() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
@@ -122,7 +122,7 @@ fun AgentInfoCard() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .offset(y = (-40).dp),
+            .padding(top = 16.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = PrimaryBlue.copy(alpha = 0.15f)
@@ -157,7 +157,7 @@ fun UserPersonasSection() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .offset(y = (-20).dp)
+            .padding(top = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
