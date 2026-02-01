@@ -31,6 +31,7 @@ import androidx.navigation.NavController
 import com.example.prototypetesting.data.*
 import com.example.prototypetesting.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -72,6 +73,7 @@ fun AgentSimulationScreen(
     // 动画
     val cursorAnimX = remember { Animatable(0.5f) }
     val cursorAnimY = remember { Animatable(0.1f) }
+    val coroutineScope = rememberCoroutineScope()
 
     // 剧本执行器
     LaunchedEffect(isRunning) {
@@ -244,8 +246,10 @@ fun AgentSimulationScreen(
                         toastMessage = null
                         visibleLogs.clear()
                         currentLogIndex = 0
-                        cursorAnimX.snapTo(0.5f)
-                        cursorAnimY.snapTo(0.1f)
+                        coroutineScope.launch {
+                            cursorAnimX.snapTo(0.5f)
+                            cursorAnimY.snapTo(0.1f)
+                        }
                         isRunning = true
                     },
                     enabled = !isRunning,
@@ -488,8 +492,9 @@ private fun SimulationStage(
             // 光标 (手指图标)
             if (showCursor) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val offsetX = (cursorPosition.x * maxWidth.value).dp
-                    val offsetY = (cursorPosition.y * maxHeight.value).dp
+                    val constraints = this
+                    val offsetX = (cursorPosition.x * constraints.maxWidth.value).dp
+                    val offsetY = (cursorPosition.y * constraints.maxHeight.value).dp
 
                     Box(
                         modifier = Modifier
